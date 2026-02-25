@@ -33,14 +33,26 @@ await build({
     "ws",
     // Electron is never available in the WSL server
     "electron",
-    "@sentry/electron",
-    "@sentry/electron/main",
     // Codex binary resolved at runtime via require.resolve
     "@zed-industries/codex-acp",
     "@zed-industries/codex-acp/*",
+    // jsonc-parser UMD has dynamic require('./impl/format') that can't be bundled
+    "jsonc-parser",
   ],
+  alias: {
+    // Replace Sentry with a no-op stub — @sentry/electron depends on
+    // Electron APIs that don't exist in the WSL server process.
+    "@sentry/electron/main": join(__dirname, "stubs/sentry.js"),
+    "@sentry/electron": join(__dirname, "stubs/sentry.js"),
+  },
+  // Polyfill import.meta.url for ESM modules bundled into CJS (e.g. @mcpc-tech/acp-ai-provider
+  // uses createRequire(import.meta.url) which is undefined in CJS format).
+  banner: {
+    js: `var __import_meta_url = require("url").pathToFileURL(__filename).href;`,
+  },
   define: {
     "process.env.NODE_ENV": '"production"',
+    "import.meta.url": "__import_meta_url",
     // Stub import.meta.env for Vite-specific code pulled in transitively
     "import.meta.env": "{}",
   },

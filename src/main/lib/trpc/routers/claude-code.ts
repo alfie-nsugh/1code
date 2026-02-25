@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm"
 import { getHostAPI } from "../../../../shared/host-api"
 import { z } from "zod"
-import { getAuthManager } from "../../../index"
+import { getAuthManager } from "../../app-context"
 import { getClaudeShellEnvironment } from "../../claude"
 import { getExistingClaudeToken } from "../../claude-token"
 import { getApiUrl } from "../../config"

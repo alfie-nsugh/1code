@@ -4,7 +4,7 @@ import { getDatabase } from "../../db";
 import { chats, subChats, projects } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { getHostAPI } from "../../../../shared/host-api";
-import { getAuthManager, getBaseUrl } from "../../../index";
+import { getAuthManager, getBaseUrl } from "../../app-context";
 import { createWorktreeForChat } from "../../git/worktree";
 import { importSandboxToWorktree, type ExportClaudeSession } from "../../git/sandbox-import";
 import { getGitRemoteInfo } from "../../git";

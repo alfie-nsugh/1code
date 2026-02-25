@@ -1,7 +1,7 @@
 import { router, publicProcedure } from "../index"
 import { getDatabase, projects, chats, subChats } from "../../db"
 import { getHostAPI } from "../../../../shared/host-api"
-import { getAuthManager } from "../../../index"
+import { getAuthManager } from "../../app-context"
 import { z } from "zod"
 import { clearNetworkCache } from "../../ollama/network-detector"
 
