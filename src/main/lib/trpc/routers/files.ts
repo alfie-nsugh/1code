@@ -2,7 +2,7 @@ import { z } from "zod"
 import { router, publicProcedure } from "../index"
 import { readdir, stat, readFile, writeFile, mkdir, rename as fsRename, rm } from "node:fs/promises"
 import { join, relative, basename, extname, dirname, resolve, isAbsolute } from "node:path"
-import { app, shell } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import { watch } from "node:fs"
 import { observable } from "@trpc/server/observable"
 
@@ -445,7 +445,7 @@ export const filesRouter = router({
       const { subChatId, text, filename } = input
 
       // Create pasted directory in session folder
-      const sessionDir = join(app.getPath("userData"), "claude-sessions", subChatId)
+      const sessionDir = join(getHostAPI().getDataDir(), "claude-sessions", subChatId)
       const pastedDir = join(sessionDir, "pasted")
       await mkdir(pastedDir, { recursive: true })
 
@@ -505,7 +505,7 @@ export const filesRouter = router({
     }))
     .mutation(async ({ input }) => {
       validatePathSafe(input.absolutePath)
-      await shell.trashItem(input.absolutePath)
+      await getHostAPI().trashItem(input.absolutePath)
       return { success: true }
     }),
 })

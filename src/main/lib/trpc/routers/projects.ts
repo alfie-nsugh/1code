@@ -2,7 +2,7 @@ import { z } from "zod"
 import { router, publicProcedure } from "../index"
 import { getDatabase, projects } from "../../db"
 import { eq, desc } from "drizzle-orm"
-import { dialog, BrowserWindow, app } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import { basename, join } from "path"
 import { exec } from "node:child_process"
 import { promisify } from "node:util"
@@ -45,23 +45,8 @@ export const projectsRouter = router({
   /**
    * Open folder picker and create project
    */
-  openFolder: publicProcedure.mutation(async ({ ctx }) => {
-    const window = ctx.getWindow?.() ?? BrowserWindow.getFocusedWindow()
-
-    if (!window) {
-      console.error("[Projects] No window available for folder dialog")
-      return null
-    }
-
-    // Ensure window is focused before showing dialog (fixes first-launch timing issue on macOS)
-    if (!window.isFocused()) {
-      console.log("[Projects] Window not focused, focusing before dialog...")
-      window.focus()
-      // Small delay to ensure focus is applied by the OS
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-
-    const result = await dialog.showOpenDialog(window, {
+  openFolder: publicProcedure.mutation(async () => {
+    const result = await getHostAPI().showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
       title: "Select Project Folder",
       buttonLabel: "Open Project",
@@ -276,7 +261,7 @@ export const projectsRouter = router({
       }
 
       // Clone to ~/.21st/repos/{owner}/{repo}
-      const homePath = app.getPath("home")
+      const homePath = getHostAPI().getHomeDir()
       const reposDir = join(homePath, ".21st", "repos", owner)
       const clonePath = join(reposDir, repo)
 
@@ -363,20 +348,8 @@ export const projectsRouter = router({
         expectedRepo: z.string(),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      const window = ctx.getWindow?.() ?? BrowserWindow.getFocusedWindow()
-
-      if (!window) {
-        return { success: false as const, reason: "no-window" as const }
-      }
-
-      // Ensure window is focused
-      if (!window.isFocused()) {
-        window.focus()
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
-
-      const result = await dialog.showOpenDialog(window, {
+    .mutation(async ({ input }) => {
+      const result = await getHostAPI().showOpenDialog({
         properties: ["openDirectory"],
         title: `Locate ${input.expectedOwner}/${input.expectedRepo}`,
         buttonLabel: "Select",
@@ -451,25 +424,13 @@ export const projectsRouter = router({
    */
   pickCloneDestination: publicProcedure
     .input(z.object({ suggestedName: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const window = ctx.getWindow?.() ?? BrowserWindow.getFocusedWindow()
-
-      if (!window) {
-        return { success: false as const, reason: "no-window" as const }
-      }
-
-      // Ensure window is focused
-      if (!window.isFocused()) {
-        window.focus()
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
-
+    .mutation(async ({ input }) => {
       // Default to ~/.21st/repos/
-      const homePath = app.getPath("home")
+      const homePath = getHostAPI().getHomeDir()
       const defaultPath = join(homePath, ".21st", "repos")
       await mkdir(defaultPath, { recursive: true })
 
-      const result = await dialog.showOpenDialog(window, {
+      const result = await getHostAPI().showOpenDialog({
         properties: ["openDirectory", "createDirectory"],
         title: "Choose where to clone",
         defaultPath,
@@ -489,16 +450,8 @@ export const projectsRouter = router({
    */
   uploadIcon: publicProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const window = ctx.getWindow?.() ?? BrowserWindow.getFocusedWindow()
-      if (!window) return null
-
-      if (!window.isFocused()) {
-        window.focus()
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
-
-      const result = await dialog.showOpenDialog(window, {
+    .mutation(async ({ input }) => {
+      const result = await getHostAPI().showOpenDialog({
         properties: ["openFile"],
         title: "Select Project Icon",
         buttonLabel: "Set Icon",
@@ -511,7 +464,7 @@ export const projectsRouter = router({
 
       const sourcePath = result.filePaths[0]
       const ext = extname(sourcePath)
-      const iconsDir = join(app.getPath("userData"), "project-icons")
+      const iconsDir = join(getHostAPI().getDataDir(), "project-icons")
       await mkdir(iconsDir, { recursive: true })
 
       const destPath = join(iconsDir, `${input.id}${ext}`)

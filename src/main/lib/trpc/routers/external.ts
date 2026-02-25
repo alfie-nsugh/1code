@@ -1,4 +1,4 @@
-import { clipboard, shell } from "electron";
+import { getHostAPI } from "../../../../shared/host-api";
 import { execFileSync, spawn } from "node:child_process";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -34,7 +34,7 @@ function openPathInApp(app: ExternalApp, targetPath: string): Promise<void> {
 	const expandedPath = expandTilde(targetPath);
 
 	if (app === "finder") {
-		shell.showItemInFolder(expandedPath);
+		getHostAPI().showItemInFolder(expandedPath);
 		return Promise.resolve();
 	}
 
@@ -50,7 +50,7 @@ export const externalRouter = router({
 		.input(z.string())
 		.mutation(async ({ input: inputPath }) => {
 			const expandedPath = expandTilde(inputPath);
-			shell.showItemInFolder(expandedPath);
+			getHostAPI().showItemInFolder(expandedPath);
 			return { success: true };
 		}),
 
@@ -69,7 +69,7 @@ export const externalRouter = router({
 	copyPath: publicProcedure
 		.input(z.string())
 		.mutation(({ input: inputPath }) => {
-			clipboard.writeText(inputPath);
+			getHostAPI().clipboardWrite(inputPath);
 			return { success: true };
 		}),
 
@@ -113,14 +113,14 @@ export const externalRouter = router({
 			}
 
 			// Fallback: use shell.openPath which opens with default app
-			await shell.openPath(filePath);
+			await getHostAPI().openPath(filePath);
 			return { success: true, editor: "default" };
 		}),
 
 	openExternal: publicProcedure
 		.input(z.string())
 		.mutation(async ({ input: url }) => {
-			await shell.openExternal(url);
+			await getHostAPI().openExternal(url);
 			return { success: true };
 		}),
 });

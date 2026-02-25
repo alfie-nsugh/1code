@@ -1,6 +1,7 @@
 import { router, publicProcedure } from "../index"
 import { getDatabase, projects, chats, subChats } from "../../db"
-import { app, shell } from "electron"
+import { app } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import { getAuthManager } from "../../../index"
 import { z } from "zod"
 import { clearNetworkCache } from "../../ollama/network-detector"
@@ -40,11 +41,11 @@ export const debugRouter = router({
     }
 
     return {
-      version: app.getVersion(),
+      version: getHostAPI().getVersion(),
       platform: process.platform,
       arch: process.arch,
       isDev: IS_DEV,
-      userDataPath: app.getPath("userData"),
+      userDataPath: getHostAPI().getDataDir(),
       protocolRegistered,
     }
   }),
@@ -104,8 +105,8 @@ export const debugRouter = router({
    * Open userData folder in system file manager
    */
   openUserDataFolder: publicProcedure.mutation(() => {
-    const userDataPath = app.getPath("userData")
-    shell.openPath(userDataPath)
+    const userDataPath = getHostAPI().getDataDir()
+    getHostAPI().openPath(userDataPath)
     console.log("[Debug] Opened userData folder:", userDataPath)
     return { success: true }
   }),
