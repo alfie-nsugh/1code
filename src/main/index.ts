@@ -3,6 +3,12 @@ import { app, BrowserWindow, dialog, Menu, nativeImage, session } from "electron
 import { existsSync, readFileSync, readlinkSync, unlinkSync } from "fs"
 import { createServer } from "http"
 import { join } from "path"
+import {
+  startWSLServer,
+  stopWSLServer,
+  getServerPorts,
+} from "./wsl/server-manager"
+import { ControlClient } from "./wsl/control-client"
 import { AuthManager, initAuthManager, getAuthManager as getAuthManagerFromModule } from "./auth-manager"
 import {
   identify,
@@ -44,6 +50,36 @@ import { IS_DEV, AUTH_SERVER_PORT } from "./constants"
 // Deep link protocol (must match package.json build.protocols.schemes)
 // Use different protocol in dev to avoid conflicts with production app
 const PROTOCOL = IS_DEV ? "twentyfirst-agents-dev" : "twentyfirst-agents"
+
+// ---------------------------------------------------------------------------
+// WSL mode support
+// ---------------------------------------------------------------------------
+
+let controlClient: ControlClient | null = null
+
+/**
+ * Read WSL mode preference from a settings file in userData.
+ * Returns { enabled, distro } if WSL mode is configured.
+ */
+function getWSLSettings(): { enabled: boolean; distro: string } {
+  try {
+    const settingsPath = join(app.getPath("userData"), "wsl-settings.json")
+    if (existsSync(settingsPath)) {
+      const settings = JSON.parse(readFileSync(settingsPath, "utf-8"))
+      if (settings.enabled === true && typeof settings.distro === "string") {
+        return { enabled: true, distro: settings.distro }
+      }
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return { enabled: false, distro: "" }
+}
+
+/** Exported so the renderer / settings UI can check WSL mode state. */
+export function isWSLModeEnabled(): boolean {
+  return getWSLSettings().enabled
+}
 
 // Set dev mode userData path BEFORE requestSingleInstanceLock()
 // This ensures dev and prod have separate instance locks
@@ -931,12 +967,33 @@ if (gotTheLock) {
       }
     })
 
-    // Initialize database
-    try {
-      initDatabase()
-      console.log("[App] Database initialized")
-    } catch (error) {
-      console.error("[App] Failed to initialize database:", error)
+    // WSL mode: start the WSL backend server before creating the main window
+    const wslSettings = getWSLSettings()
+    if (wslSettings.enabled) {
+      console.log(`[App] WSL mode enabled — distro: ${wslSettings.distro}`)
+      const { control } = getServerPorts()
+
+      startWSLServer({
+        distro: wslSettings.distro,
+        onReady: () => {
+          console.log("[App] WSL server ready — connecting control client")
+          controlClient = new ControlClient(control, getWindow)
+          controlClient.connect()
+        },
+        onExit: (code) => {
+          console.warn(`[App] WSL server exited (code ${code})`)
+        },
+      })
+    }
+
+    // Initialize database (in WSL mode, DB is managed by the WSL server — skip local init)
+    if (!wslSettings.enabled) {
+      try {
+        initDatabase()
+        console.log("[App] Database initialized")
+      } catch (error) {
+        console.error("[App] Failed to initialize database:", error)
+      }
     }
 
     // Create main window
@@ -1002,6 +1059,11 @@ if (gotTheLock) {
   // Cleanup before quit
   app.on("before-quit", async () => {
     console.log("[App] Shutting down...")
+
+    // Stop WSL server and control client if active
+    controlClient?.disconnect()
+    stopWSLServer()
+
     cancelAllPendingOAuth()
     await cleanupGitWatchers()
     await shutdownAnalytics()

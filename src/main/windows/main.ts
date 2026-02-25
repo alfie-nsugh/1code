@@ -16,7 +16,7 @@ import { createIPCHandler } from "trpc-electron/main"
 import { createAppRouter } from "../lib/trpc/routers"
 import { ElectronHostAPI } from "../lib/host-api-electron"
 import { setHostAPI } from "../../shared/host-api"
-import { getAuthManager, handleAuthCode, getBaseUrl } from "../index"
+import { getAuthManager, handleAuthCode, getBaseUrl, isWSLModeEnabled } from "../index"
 import { registerGitWatcherIPC } from "../lib/git/watcher"
 import { hasActiveClaudeSessions, abortAllClaudeSessions } from "../lib/trpc/routers/claude"
 import { hasActiveCodexStreams, abortAllCodexStreams } from "../lib/trpc/routers/codex"
@@ -667,16 +667,19 @@ export function createWindow(options?: { chatId?: string; subChatId?: string }):
   )
 
   // Setup tRPC IPC handler (singleton pattern)
-  if (ipcHandler) {
-    // Reuse existing handler, just attach new window
-    ipcHandler.attachWindow(window)
-  } else {
-    // Create new handler with context
-    ipcHandler = createIPCHandler({
-      router: createAppRouter(),
-      windows: [window],
-      createContext: async () => ({}),
-    })
+  // In WSL mode, tRPC goes over WebSocket — no local IPC handler needed
+  if (!isWSLModeEnabled()) {
+    if (ipcHandler) {
+      // Reuse existing handler, just attach new window
+      ipcHandler.attachWindow(window)
+    } else {
+      // Create new handler with context
+      ipcHandler = createIPCHandler({
+        router: createAppRouter(),
+        windows: [window],
+        createContext: async () => ({}),
+      })
+    }
   }
 
   // Show window when ready
