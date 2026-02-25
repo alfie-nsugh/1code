@@ -3,7 +3,7 @@ import { router, publicProcedure } from "../index";
 import { getDatabase } from "../../db";
 import { chats, subChats, projects } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import { app } from "electron";
+import { getHostAPI } from "../../../../shared/host-api";
 import { getAuthManager, getBaseUrl } from "../../../index";
 import { createWorktreeForChat } from "../../git/worktree";
 import { importSandboxToWorktree, type ExportClaudeSession } from "../../git/sandbox-import";
@@ -53,7 +53,7 @@ async function writeClaudeSession(
 ): Promise<void> {
 	// Desktop's isolated config dir for this subChat (same as claude.ts uses)
 	const isolatedConfigDir = join(
-		app.getPath("userData"),
+		getHostAPI().getDataDir(),
 		"claude-sessions",
 		subChatId
 	);

@@ -1,6 +1,5 @@
 import { router, publicProcedure } from "../index"
 import { getDatabase, projects, chats, subChats } from "../../db"
-import { app } from "electron"
 import { getHostAPI } from "../../../../shared/host-api"
 import { getAuthManager } from "../../../index"
 import { z } from "zod"
@@ -9,6 +8,28 @@ import { clearNetworkCache } from "../../ollama/network-detector"
 // Protocol constant (must match main/index.ts)
 const IS_DEV = !!process.env.ELECTRON_RENDERER_URL
 const PROTOCOL = IS_DEV ? "twentyfirst-agents-dev" : "twentyfirst-agents"
+
+/**
+ * Check if the app is registered as the default protocol handler.
+ * Uses Electron's app.isDefaultProtocolClient() when available,
+ * returns false in non-Electron environments (e.g. WSL server).
+ */
+function checkProtocolRegistration(): boolean {
+  try {
+    // Dynamic import to avoid hard dependency on electron
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { app } = require("electron")
+    return process.defaultApp
+      ? app.isDefaultProtocolClient(
+          PROTOCOL,
+          process.execPath,
+          [process.argv[1]!],
+        )
+      : app.isDefaultProtocolClient(PROTOCOL)
+  } catch {
+    return false
+  }
+}
 
 // Global flag for simulating offline mode (for testing)
 let simulateOfflineMode = false
@@ -26,27 +47,13 @@ export const debugRouter = router({
    * Get system information for debug display
    */
   getSystemInfo: publicProcedure.query(() => {
-    // Check protocol registration
-    let protocolRegistered = false
-    try {
-      protocolRegistered = process.defaultApp
-        ? app.isDefaultProtocolClient(
-            PROTOCOL,
-            process.execPath,
-            [process.argv[1]!],
-          )
-        : app.isDefaultProtocolClient(PROTOCOL)
-    } catch {
-      protocolRegistered = false
-    }
-
     return {
       version: getHostAPI().getVersion(),
       platform: process.platform,
       arch: process.arch,
       isDev: IS_DEV,
       userDataPath: getHostAPI().getDataDir(),
-      protocolRegistered,
+      protocolRegistered: checkProtocolRegistration(),
     }
   }),
 

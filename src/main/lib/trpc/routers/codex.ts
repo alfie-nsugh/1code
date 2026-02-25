@@ -2,7 +2,7 @@ import { createACPProvider, type ACPProvider } from "@mcpc-tech/acp-ai-provider"
 import { observable } from "@trpc/server/observable"
 import { streamText } from "ai"
 import { eq } from "drizzle-orm"
-import { app } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import { spawn, type ChildProcess } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
@@ -236,10 +236,10 @@ function resolveCodexAcpBinaryPath(): string {
 
 function resolveBundledCodexCliPath(): string {
   const binaryName = process.platform === "win32" ? "codex.exe" : "codex"
-  const resourcesDir = app.isPackaged
+  const resourcesDir = getHostAPI().isPackaged()
     ? join(process.resourcesPath, "bin")
     : join(
-        app.getAppPath(),
+        getHostAPI().getAppPath(),
         "resources",
         "bin",
         `${process.platform}-${process.arch}`,
@@ -250,7 +250,7 @@ function resolveBundledCodexCliPath(): string {
     return binaryPath
   }
 
-  const hint = app.isPackaged
+  const hint = getHostAPI().isPackaged()
     ? "Binary is missing from bundled resources."
     : "Run `bun run codex:download` to download it for local dev."
 

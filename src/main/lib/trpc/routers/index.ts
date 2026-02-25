@@ -19,13 +19,13 @@ import { commandsRouter } from "./commands"
 import { voiceRouter } from "./voice"
 import { pluginsRouter } from "./plugins"
 import { createGitRouter } from "../../git"
-import { BrowserWindow } from "electron"
 
 /**
  * Create the main app router
- * Uses getter pattern to avoid stale window references
+ * In Electron mode, getWindow returns the main BrowserWindow.
+ * In WSL server mode, getWindow is not needed (HostAPI handles renderer communication).
  */
-export function createAppRouter(getWindow: () => BrowserWindow | null) {
+export function createAppRouter() {
   return router({
     projects: projectsRouter,
     chats: chatsRouter,

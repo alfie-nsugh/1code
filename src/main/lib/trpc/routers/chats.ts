@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm"
-import { BrowserWindow } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import * as fs from "fs/promises"
 import * as path from "path"
 import simpleGit from "simple-git"
@@ -35,26 +35,10 @@ type WorktreeSetupFailurePayload = {
 }
 
 function sendWorktreeSetupFailure(
-  windowId: number | null,
+  _windowId: number | null,
   payload: WorktreeSetupFailurePayload,
 ): void {
-  const targets: BrowserWindow[] = []
-
-  if (windowId !== null) {
-    const window = BrowserWindow.fromId(windowId)
-    if (window && !window.isDestroyed()) {
-      targets.push(window)
-    }
-  }
-
-  if (targets.length === 0) {
-    targets.push(...BrowserWindow.getAllWindows())
-  }
-
-  for (const window of targets) {
-    if (window.isDestroyed()) continue
-    window.webContents.send("worktree:setup-failed", payload)
-  }
+  getHostAPI().emitToRenderer("worktree:setup-failed", payload)
 }
 
 // Fallback to truncated user message if AI generation fails
@@ -315,7 +299,7 @@ export const chatsRouter = router({
     .mutation(async ({ input, ctx }) => {
       console.log("[chats.create] called with:", input)
       const db = getDatabase()
-      const requestingWindowId = ctx.getWindow?.()?.id ?? null
+      const requestingWindowId: number | null = null
 
       // Get project path
       const project = db

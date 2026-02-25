@@ -1,6 +1,5 @@
 import { observable } from "@trpc/server/observable"
 import { eq } from "drizzle-orm"
-import { app, BrowserWindow } from "electron"
 import { getHostAPI } from "../../../../shared/host-api"
 import * as fs from "fs/promises"
 import * as os from "os"
@@ -1149,7 +1148,7 @@ export const claudeRouter = router({
             // cross-chat contamination when multiple chats use the same project folder
             // For Ollama: use chatId instead of subChatId so all messages in the same chat share history
             const isolatedConfigDir = path.join(
-              app.getPath("userData"),
+              getHostAPI().getDataDir(),
               "claude-sessions",
               isUsingOllama ? input.chatId : input.subChatId,
             )
@@ -2404,14 +2403,11 @@ ${prompt}
                           ) {
                             const filePath = toolPart.input?.file_path
                             if (filePath) {
-                              const windows = BrowserWindow.getAllWindows()
-                              for (const win of windows) {
-                                win.webContents.send("file-changed", {
+                              getHostAPI().emitToRenderer("file-changed", {
                                   filePath,
                                   type: toolPart.type,
                                   subChatId: input.subChatId,
                                 })
-                              }
                             }
                           }
                         }
@@ -2548,7 +2544,7 @@ ${prompt}
                 }
 
                 // Track error in Sentry (only if app is ready and Sentry is available)
-                if (app.isReady() && app.isPackaged) {
+                if (getHostAPI().isPackaged()) {
                   try {
                     const Sentry = await import("@sentry/electron/main")
                     Sentry.captureException(err, {

@@ -673,11 +673,9 @@ export function createWindow(options?: { chatId?: string; subChatId?: string }):
   } else {
     // Create new handler with context
     ipcHandler = createIPCHandler({
-      router: createAppRouter(getWindow),
+      router: createAppRouter(),
       windows: [window],
-      createContext: async () => ({
-        getWindow,
-      }),
+      createContext: async () => ({}),
     })
   }
 

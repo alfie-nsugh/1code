@@ -1,13 +1,14 @@
 import { initTRPC } from "@trpc/server"
-import { BrowserWindow } from "electron"
 import superjson from "superjson"
 
 /**
- * Context passed to all tRPC procedures
+ * Context passed to all tRPC procedures.
+ *
+ * Previously included `getWindow` for accessing the BrowserWindow, but all
+ * window operations are now handled by the HostAPI abstraction. The context
+ * is kept as an empty interface for forward-compatibility.
  */
-export interface Context {
-  getWindow: () => BrowserWindow | null
-}
+export interface Context {}
 
 /**
  * Initialize tRPC with context and superjson transformer
