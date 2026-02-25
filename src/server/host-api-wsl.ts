@@ -45,8 +45,9 @@ export class WSLServerHostAPI implements HostAPI {
   }
 
   getResourcesDir(): string {
-    // In WSL server mode, resources live alongside the server bundle
-    return path.join(this.dataDir, "server")
+    // Resources (migrations, etc.) live alongside the server bundle.
+    // Works for both dev (resources/wsl-server/) and production (~/.local/share/1code/server/).
+    return __dirname
   }
 
   getAppPath(): string {

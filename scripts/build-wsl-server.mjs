@@ -9,7 +9,7 @@
 import { build } from "esbuild"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
-import { mkdirSync } from "fs"
+import { mkdirSync, cpSync } from "fs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, "..")
@@ -47,4 +47,10 @@ await build({
   sourcemap: true,
 })
 
+// Copy Drizzle migrations alongside the bundle so the WSL server can find them
+const migrationsSource = join(root, "drizzle")
+const migrationsDest = join(outdir, "migrations")
+cpSync(migrationsSource, migrationsDest, { recursive: true })
+
 console.log(`WSL server bundle built: ${join(outdir, "index.js")}`)
+console.log(`Migrations copied to: ${migrationsDest}`)

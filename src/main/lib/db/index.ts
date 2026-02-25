@@ -30,8 +30,8 @@ function getDatabasePath(): string {
  */
 function getMigrationsPath(): string {
   if (getHostAPI().isPackaged()) {
-    // Production: migrations bundled in resources
-    return join(process.resourcesPath, "migrations")
+    // Production / WSL server: migrations bundled in resources
+    return join(getHostAPI().getResourcesDir(), "migrations")
   }
   // Development: from out/main -> apps/desktop/drizzle
   return join(__dirname, "../../drizzle")
