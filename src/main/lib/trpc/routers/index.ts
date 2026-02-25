@@ -18,6 +18,7 @@ import { sandboxImportRouter } from "./sandbox-import"
 import { commandsRouter } from "./commands"
 import { voiceRouter } from "./voice"
 import { pluginsRouter } from "./plugins"
+import { wslRouter } from "./wsl"
 import { createGitRouter } from "../../git"
 
 /**
@@ -46,6 +47,7 @@ export function createAppRouter() {
     commands: commandsRouter,
     voice: voiceRouter,
     plugins: pluginsRouter,
+    wsl: wslRouter,
     // Git operations - named "changes" to match Superset API
     changes: createGitRouter(),
   })
