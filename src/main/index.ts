@@ -3,12 +3,9 @@ import { app, BrowserWindow, dialog, Menu, nativeImage, session } from "electron
 import { existsSync, readFileSync, readlinkSync, unlinkSync } from "fs"
 import { createServer } from "http"
 import { join } from "path"
-import {
-  startWSLServer,
-  stopWSLServer,
-  getServerPorts,
-} from "./wsl/server-manager"
-import { ControlClient } from "./wsl/control-client"
+// WSL modules are loaded dynamically to avoid pulling in "ws" on Windows
+// when WSL mode is not enabled. See the wslSettings.enabled block below.
+type ControlClientType = import("./wsl/control-client").ControlClient
 import { AuthManager, initAuthManager, getAuthManager as getAuthManagerFromModule } from "./auth-manager"
 import {
   identify,
@@ -55,7 +52,7 @@ const PROTOCOL = IS_DEV ? "twentyfirst-agents-dev" : "twentyfirst-agents"
 // WSL mode support
 // ---------------------------------------------------------------------------
 
-let controlClient: ControlClient | null = null
+let controlClient: ControlClientType | null = null
 
 /**
  * Read WSL mode preference from a settings file in userData.
@@ -971,6 +968,8 @@ if (gotTheLock) {
     const wslSettings = getWSLSettings()
     if (wslSettings.enabled) {
       console.log(`[App] WSL mode enabled — distro: ${wslSettings.distro}`)
+      const { startWSLServer, getServerPorts } = require("./wsl/server-manager")
+      const { ControlClient } = require("./wsl/control-client")
       const { control } = getServerPorts()
 
       startWSLServer({
@@ -980,7 +979,7 @@ if (gotTheLock) {
           controlClient = new ControlClient(control, getWindow)
           controlClient.connect()
         },
-        onExit: (code) => {
+        onExit: (code: number | null) => {
           console.warn(`[App] WSL server exited (code ${code})`)
         },
       })
@@ -1062,7 +1061,12 @@ if (gotTheLock) {
 
     // Stop WSL server and control client if active
     controlClient?.disconnect()
-    stopWSLServer()
+    try {
+      const { stopWSLServer } = require("./wsl/server-manager")
+      stopWSLServer()
+    } catch {
+      // WSL modules not loaded — not in WSL mode
+    }
 
     cancelAllPendingOAuth()
     await cleanupGitWatchers()
