@@ -1,34 +1,114 @@
 # Running 1Code with WSL
 
-1Code supports a split architecture where the React UI runs natively on Windows while all backend operations (Claude SDK, terminal, file system, git, database) execute inside WSL. This gives you native Linux toolchain access without leaving the Windows desktop.
+1Code supports a split architecture where the React UI runs natively on Windows while all backend operations (Claude SDK, terminal, file system, git, database) execute inside WSL.
 
 ## Prerequisites
 
 - **Windows 10/11** with WSL 2 installed (`wsl --install`)
-- A WSL distribution (e.g., Ubuntu) with **Node.js 20+** installed
-- 1Code built from the `feat/wsl-split-architecture` branch
+- A WSL distribution (e.g., Ubuntu) with **Node.js 20+**
+- **bun** installed in WSL (`curl -fsSL https://bun.sh/install | bash`)
+- The repo cloned somewhere accessible from both Windows and WSL
 
 ### Installing Node.js in WSL
 
 ```bash
-# Inside your WSL distro
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
-node --version  # should print v20.x or higher
+node --version  # v20.x or higher
 ```
 
-## Quick Start
+---
 
-1. **Open 1Code** on Windows normally.
-2. Go to **Settings > WSL** (in the Advanced section).
-3. Select your WSL distribution from the dropdown.
-4. Toggle **Enable WSL Mode** on.
-5. **Restart 1Code** when prompted.
+## Development Workflow (from source)
 
-On restart, 1Code will:
-- Launch a Node.js backend server inside your WSL distro
-- Connect the UI to the WSL server over WebSocket (`ws://localhost:19100`)
-- Route all Claude, terminal, file, and git operations through WSL
+There are two processes to run — one on each side:
+
+```
+ WINDOWS (PowerShell)              WSL (bash)
+ ────────────────────              ──────────
+ bun run dev                       node resources/wsl-server/index.js
+ → Electron app + React UI         → tRPC backend server
+ → connects to WSL server           → Claude, terminal, files, git, DB
+```
+
+### Step 1: Build the server bundle (WSL)
+
+```bash
+# In WSL, from the repo root
+bun install --ignore-scripts   # skip electron-rebuild (not needed in WSL)
+bun run server:build           # → resources/wsl-server/index.js
+```
+
+### Step 2: Install server dependencies (WSL)
+
+The bundle externalizes native modules. Install them once:
+
+```bash
+cd resources/wsl-server
+npm init -y
+npm install better-sqlite3 node-pty ws
+cd ../..
+```
+
+### Step 3: Start the WSL server
+
+```bash
+# In WSL, from the repo root
+# The server needs an auth token — for dev, pass it directly:
+ANTHROPIC_AUTH_TOKEN=<your-api-key> node resources/wsl-server/index.js
+```
+
+You should see:
+```
+[1code-server] Starting WSL backend server...
+[1code-server] Control channel listening on ws://localhost:19101
+[1code-server] tRPC WebSocket listening on ws://localhost:19100
+[1code-server] Ready.
+```
+
+> **Note:** Without `ANTHROPIC_AUTH_TOKEN`, the server waits 60s for the
+> Electron shell to send a token via the control channel, then exits.
+> For standalone dev, always pass the token as an env var.
+
+### Step 4: Start the Electron app (Windows)
+
+```powershell
+# In PowerShell, from the repo root (Windows path)
+bun run dev
+```
+
+### Step 5: Tell the renderer to use WebSocket
+
+The renderer needs to know to connect to the WSL server instead of using Electron IPC. Open the browser console in the Electron window (Ctrl+Shift+I) and run:
+
+```js
+localStorage.setItem("1code-wsl-mode", "true")
+location.reload()
+```
+
+The UI is now talking to the WSL backend. All terminal sessions, file operations, and Claude calls execute inside WSL.
+
+To switch back to normal Electron mode:
+```js
+localStorage.removeItem("1code-wsl-mode")
+location.reload()
+```
+
+---
+
+## Production Workflow (packaged app)
+
+For end users with a packaged 1Code install:
+
+1. Open 1Code on Windows
+2. Go to **Settings > WSL** (Advanced section)
+3. Select your WSL distro from the dropdown
+4. Toggle **Enable WSL Mode** on — this auto-installs the server bundle in WSL
+5. Restart 1Code
+
+On restart, Electron spawns the WSL server automatically and manages its lifecycle (start, stop, crash recovery, auth token delivery).
+
+---
 
 ## How It Works
 
@@ -48,11 +128,9 @@ Windows (Electron)                    WSL (Node.js server)
 └──────────────────────┘
 ```
 
-**Port 19100** — tRPC WebSocket: all application RPCs (chat, terminal data, file reads, git status, etc.)
+**Port 19100** — tRPC WebSocket: all application RPCs (chat, terminal, files, git, etc.)
 
-**Port 19101** — Control channel: reverse proxy for operations that must happen on Windows (file dialogs, clipboard, safeStorage encryption, auth tokens)
-
-## Architecture Details
+**Port 19101** — Control channel: reverse proxy for operations that must happen on Windows (file dialogs, clipboard, safeStorage, auth tokens)
 
 ### What runs where
 
@@ -68,6 +146,8 @@ Windows (Electron)                    WSL (Node.js server)
 
 ### Data locations (inside WSL)
 
+In production (auto-installed by Settings UI):
+
 | Data | Path |
 |---|---|
 | Server bundle | `~/.local/share/1code/server/index.js` |
@@ -75,118 +155,58 @@ Windows (Electron)                    WSL (Node.js server)
 | SQLite database | `~/.local/share/1code/data/agents.db` |
 | Server node_modules | `~/.local/share/1code/server/node_modules/` |
 
+In development, the server runs directly from `resources/wsl-server/` in the repo.
+
 ### Auth token flow
 
-OAuth tokens are stored encrypted on Windows via Electron's `safeStorage`. On startup:
-
-1. Electron decrypts the token using Windows DPAPI
+In production:
+1. Electron decrypts the OAuth token via Windows DPAPI (safeStorage)
 2. Sends it to the WSL server over the control channel (port 19101)
-3. The server stores it in memory for Claude SDK calls
-4. If the token expires, the server requests a refresh via the control channel
+3. Server stores it in memory for Claude SDK calls
 
-## Building the WSL Server Bundle
+In development: pass `ANTHROPIC_AUTH_TOKEN` as an environment variable.
 
-If developing from source, build the server bundle before enabling WSL mode:
+---
+
+## Rebuilding After Code Changes
 
 ```bash
-# From the repo root (on Windows or WSL)
+# In WSL — rebuild the server bundle after changing backend code
 bun run server:build
+
+# Restart the server (Ctrl+C then re-run)
+ANTHROPIC_AUTH_TOKEN=<key> node resources/wsl-server/index.js
 ```
 
-This produces `resources/wsl-server/index.js` — a single-file esbuild bundle of the backend. Native modules (`better-sqlite3`, `node-pty`) are external and installed via npm inside WSL during setup.
+The Electron dev server (`bun run dev`) hot-reloads UI changes automatically. Backend changes require rebuilding and restarting the WSL server.
 
-## Manual Server Setup
-
-If the automatic setup fails, you can install manually:
-
-```bash
-# Inside WSL
-mkdir -p ~/.local/share/1code/server
-mkdir -p ~/.local/share/1code/bin
-mkdir -p ~/.local/share/1code/data
-
-# Copy server bundle (adjust the Windows path)
-cp /mnt/c/Users/<YOU>/AppData/Local/Programs/1code/resources/wsl-server/index.js \
-   ~/.local/share/1code/server/index.js
-
-# Install native dependencies
-cd ~/.local/share/1code/server
-npm init -y
-npm install better-sqlite3 node-pty
-
-# Copy Claude binary (if available)
-cp /mnt/c/Users/<YOU>/AppData/Local/Programs/1code/resources/bin/linux-x64/claude \
-   ~/.local/share/1code/bin/claude
-chmod +x ~/.local/share/1code/bin/claude
-```
-
-## Running the Server Manually (Debug)
-
-For development or debugging, you can run the WSL server standalone:
-
-```bash
-# Inside WSL
-cd ~/.local/share/1code/server
-ONECODE_SERVER_PORT=19100 node index.js
-```
-
-The server will print:
-```
-[1code-server] Starting WSL backend server...
-[1code-server] Control channel listening on ws://localhost:19101
-[1code-server] Waiting for auth token from Electron shell...
-```
-
-It will wait up to 60 seconds for the Electron shell to connect and send an auth token. For standalone testing without Electron, set the token directly:
-
-```bash
-ANTHROPIC_AUTH_TOKEN=<your-token> ONECODE_SERVER_PORT=19100 node index.js
-```
-
-## Reinstalling / Updating
-
-If the server needs updating after a 1Code update:
-
-1. Go to **Settings > WSL**
-2. Click **Reinstall Server**
-
-Or manually:
-```bash
-# Inside WSL
-rm -rf ~/.local/share/1code/server/node_modules
-# Then repeat the setup steps above
-```
-
-## Disabling WSL Mode
-
-1. Go to **Settings > WSL**
-2. Toggle **Enable WSL Mode** off
-3. Restart 1Code
-
-The app reverts to standard Electron mode with everything running on Windows.
+---
 
 ## Limitations
 
-- **MCP servers** must be Linux executables installed inside WSL. Windows-native MCP servers are not supported in WSL mode.
-- **File dialogs** open on the Windows side. Paths are translated to WSL-accessible `/mnt/` paths automatically.
-- **Performance** is equivalent to native — the WebSocket runs over localhost with sub-millisecond latency.
-- **Port 19100-19101** must be free. If something else uses those ports, set `ONECODE_SERVER_PORT` to a different base port.
+- **MCP servers** must be Linux executables installed inside WSL. Windows-native MCP servers won't work.
+- **File dialogs** open on the Windows side. Paths are translated to `/mnt/` paths.
+- **Ports 19100-19101** must be free. Override with `ONECODE_SERVER_PORT=<port>`.
 
 ## Troubleshooting
 
 ### "WSL is not available on this system"
-Install WSL: `wsl --install` in an elevated PowerShell, then reboot.
+Run `wsl --install` in an elevated PowerShell, then reboot.
 
 ### "Node.js is not installed"
-Install Node.js inside your WSL distro (see Prerequisites above).
+See Prerequisites above.
 
 ### Server fails to start
-Check the WSL distro is running: `wsl -d Ubuntu -- echo ok`
-
-Check Node.js works: `wsl -d Ubuntu -- node --version`
+```bash
+wsl -d Ubuntu -- echo ok          # is the distro running?
+wsl -d Ubuntu -- node --version   # is Node available?
+```
 
 ### "Timed out waiting for auth token"
-The Electron shell couldn't connect to the control channel. Check that port 19101 is not blocked by a firewall and that the WSL networking is functional (`wsl -- curl http://localhost:19101` from Windows).
+You're running the server without `ANTHROPIC_AUTH_TOKEN` and without the Electron shell connected. Either pass the token as an env var (dev mode) or start the Electron app with WSL mode enabled (production mode).
 
 ### Database errors
-Ensure `~/.local/share/1code/data/` exists and is writable. SQLite requires a native filesystem — do not place the database on a Windows mount (`/mnt/c/...`), as 9p filesystem locking is unreliable.
+Ensure `~/.local/share/1code/data/` exists. Don't place the DB on a Windows mount (`/mnt/c/...`) — 9p filesystem locking is unreliable for SQLite.
+
+### "Cannot find module better-sqlite3" or similar
+Run `npm install better-sqlite3 node-pty ws` in the directory containing `index.js` (either `resources/wsl-server/` for dev or `~/.local/share/1code/server/` for production).
