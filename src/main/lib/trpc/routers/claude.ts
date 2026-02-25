@@ -1,6 +1,7 @@
 import { observable } from "@trpc/server/observable"
 import { eq } from "drizzle-orm"
-import { app, BrowserWindow, safeStorage } from "electron"
+import { app, BrowserWindow } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import * as fs from "fs/promises"
 import * as os from "os"
 import path from "path"
@@ -147,14 +148,15 @@ function parseMentions(prompt: string): {
 }
 
 /**
- * Decrypt token using Electron's safeStorage
+ * Decrypt token using HostAPI (delegates to safeStorage in Electron mode)
  */
 function decryptToken(encrypted: string): string {
-  if (!safeStorage.isEncryptionAvailable()) {
+  const host = getHostAPI()
+  if (!host.isEncryptionAvailable()) {
     return Buffer.from(encrypted, "base64").toString("utf-8")
   }
   const buffer = Buffer.from(encrypted, "base64")
-  return safeStorage.decryptString(buffer)
+  return host.decryptString(buffer)
 }
 
 /**

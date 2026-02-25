@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm"
-import { safeStorage } from "electron"
+import { getHostAPI } from "../../../../shared/host-api"
 import { z } from "zod"
 import { getAuthManager } from "../../../index"
 import { anthropicAccounts, anthropicSettings, claudeCodeCredentials, getDatabase } from "../../db"
@@ -8,25 +8,27 @@ import { publicProcedure, router } from "../index"
 import { clearClaudeCaches } from "./claude"
 
 /**
- * Encrypt token using Electron's safeStorage
+ * Encrypt token using HostAPI (delegates to safeStorage in Electron mode)
  */
 function encryptToken(token: string): string {
-  if (!safeStorage.isEncryptionAvailable()) {
+  const host = getHostAPI()
+  if (!host.isEncryptionAvailable()) {
     console.warn("[AnthropicAccounts] Encryption not available, storing as base64")
     return Buffer.from(token).toString("base64")
   }
-  return safeStorage.encryptString(token).toString("base64")
+  return host.encryptString(token).toString("base64")
 }
 
 /**
- * Decrypt token using Electron's safeStorage
+ * Decrypt token using HostAPI (delegates to safeStorage in Electron mode)
  */
 function decryptToken(encrypted: string): string {
-  if (!safeStorage.isEncryptionAvailable()) {
+  const host = getHostAPI()
+  if (!host.isEncryptionAvailable()) {
     return Buffer.from(encrypted, "base64").toString("utf-8")
   }
   const buffer = Buffer.from(encrypted, "base64")
-  return safeStorage.decryptString(buffer)
+  return host.decryptString(buffer)
 }
 
 /**
