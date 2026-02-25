@@ -24,6 +24,7 @@ export default defineConfig({
           "better-sqlite3",
           "@prisma/client",
           "@anthropic-ai/claude-agent-sdk", // ESM module - must use dynamic import
+          "ws", // Only used by WSL server/control-client — not needed on Windows
         ],
         output: {
           format: "cjs",
