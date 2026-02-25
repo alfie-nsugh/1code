@@ -3,9 +3,11 @@ import { app, BrowserWindow, dialog, Menu, nativeImage, session } from "electron
 import { existsSync, readFileSync, readlinkSync, unlinkSync } from "fs"
 import { createServer } from "http"
 import { join } from "path"
-// WSL modules are loaded dynamically to avoid pulling in "ws" on Windows
-// when WSL mode is not enabled. See the wslSettings.enabled block below.
+// WSL modules that import "ws" are loaded dynamically to avoid pulling in
+// "ws" on Windows when WSL mode is not enabled. See the wslSettings.enabled block.
 type ControlClientType = import("./wsl/control-client").ControlClient
+import { ElectronHostAPI } from "./lib/host-api-electron"
+import { setHostAPI } from "../shared/host-api"
 import { AuthManager, initAuthManager, getAuthManager as getAuthManagerFromModule } from "./auth-manager"
 import {
   identify,
@@ -987,8 +989,6 @@ if (gotTheLock) {
 
     // Initialize HostAPI before anything that depends on it (database, routers, etc.)
     // createMainWindow() also calls setHostAPI() but guards against double-init.
-    const { ElectronHostAPI } = require("./lib/host-api-electron")
-    const { setHostAPI } = require("../shared/host-api")
     setHostAPI(new ElectronHostAPI(getWindow))
 
     // Initialize database (in WSL mode, DB is managed by the WSL server — skip local init)
