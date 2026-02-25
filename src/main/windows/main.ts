@@ -14,6 +14,8 @@ import { join } from "path"
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs"
 import { createIPCHandler } from "trpc-electron/main"
 import { createAppRouter } from "../lib/trpc/routers"
+import { ElectronHostAPI } from "../lib/host-api-electron"
+import { setHostAPI } from "../../shared/host-api"
 import { getAuthManager, handleAuthCode, getBaseUrl } from "../index"
 import { registerGitWatcherIPC } from "../lib/git/watcher"
 import { hasActiveClaudeSessions, abortAllClaudeSessions } from "../lib/trpc/routers/claude"
@@ -23,6 +25,10 @@ import { windowManager } from "./window-manager"
 
 // Flag to bypass close confirmation when app.quit() has already been confirmed
 let isQuitting = false
+
+// Guard so setHostAPI() is only called once (createWindow() can be called
+// multiple times on macOS when the dock icon is clicked after all windows close).
+let hostApiInitialized = false
 
 export function setIsQuitting(value: boolean): void {
   isQuitting = value
@@ -614,6 +620,14 @@ function getUseNativeFramePreference(): boolean {
 export function createWindow(options?: { chatId?: string; subChatId?: string }): BrowserWindow {
   // Register IPC handlers before creating first window
   registerIpcHandlers()
+
+  // Register the HostAPI singleton (once per process).
+  // Must happen before the tRPC router is created so that routers
+  // migrated to getHostAPI() have an implementation available.
+  if (!hostApiInitialized) {
+    setHostAPI(new ElectronHostAPI(getWindow))
+    hostApiInitialized = true
+  }
 
   // Read Windows frame preference
   const useNativeFrame = getUseNativeFramePreference()
