@@ -985,6 +985,12 @@ if (gotTheLock) {
       })
     }
 
+    // Initialize HostAPI before anything that depends on it (database, routers, etc.)
+    // createMainWindow() also calls setHostAPI() but guards against double-init.
+    const { ElectronHostAPI } = require("./lib/host-api-electron")
+    const { setHostAPI } = require("../shared/host-api")
+    setHostAPI(new ElectronHostAPI(getWindow))
+
     // Initialize database (in WSL mode, DB is managed by the WSL server — skip local init)
     if (!wslSettings.enabled) {
       try {

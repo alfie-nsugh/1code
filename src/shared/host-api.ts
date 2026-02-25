@@ -202,10 +202,10 @@ let _hostApi: HostAPI | null = null
  */
 export function setHostAPI(api: HostAPI): void {
   if (_hostApi !== null) {
-    throw new Error(
-      "setHostAPI() has already been called. " +
-        "The HostAPI singleton can only be set once per process.",
-    )
+    // Already initialized — skip silently.  This can happen because both
+    // index.ts (early, before DB init) and createMainWindow() call setHostAPI
+    // to ensure it's available regardless of startup order.
+    return
   }
   _hostApi = api
 }
