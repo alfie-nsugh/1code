@@ -29,9 +29,20 @@ await build({
     // Native modules — must be installed in WSL via npm
     "better-sqlite3",
     "node-pty",
+    // ws is installed alongside the server in WSL
+    "ws",
+    // Electron is never available in the WSL server
+    "electron",
+    "@sentry/electron",
+    "@sentry/electron/main",
+    // Codex binary resolved at runtime via require.resolve
+    "@zed-industries/codex-acp",
+    "@zed-industries/codex-acp/*",
   ],
   define: {
     "process.env.NODE_ENV": '"production"',
+    // Stub import.meta.env for Vite-specific code pulled in transitively
+    "import.meta.env": "{}",
   },
   sourcemap: true,
 })

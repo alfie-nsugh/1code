@@ -73,7 +73,7 @@ export async function installWSLServer(
       echo "PROGRESS: Installing native dependencies (this may take a minute)..."
       cd ~/.local/share/1code/server
       npm init -y 2>/dev/null
-      npm install better-sqlite3 node-pty 2>/dev/null
+      npm install better-sqlite3 node-pty ws 2>/dev/null
     fi
 
     echo "SETUP_COMPLETE"
