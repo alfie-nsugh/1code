@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Terminal } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import {
   EyeOpenFilledIcon,
@@ -102,6 +102,13 @@ const DEBUG_TAB = {
   icon: BugFilledIcon,
 }
 
+// WSL tab definition (Windows only)
+const WSL_TAB = {
+  id: "wsl" as SettingsTab,
+  label: "WSL",
+  icon: Terminal,
+}
+
 interface TabButtonProps {
   tab: {
     id: SettingsTab
@@ -157,11 +164,17 @@ export function SettingsSidebar() {
 
   // Show debug tab if in development OR if devtools are unlocked
   const showDebugTab = isDevelopment || devToolsUnlocked
+  const isWindows = typeof window !== "undefined" && window.desktopApi?.platform === "win32"
 
   const mainTabs = useMemo(() => {
     if (showDebugTab) return [...MAIN_TABS, DEBUG_TAB]
     return MAIN_TABS
   }, [showDebugTab])
+
+  const advancedTabs = useMemo(() => {
+    if (isWindows) return [...ADVANCED_TABS_BASE, WSL_TAB]
+    return ADVANCED_TABS_BASE
+  }, [isWindows])
 
   const handleTabClick = (tabId: SettingsTab) => {
     // Handle Beta tab clicks for devtools unlock
@@ -218,7 +231,7 @@ export function SettingsSidebar() {
 
         {/* Advanced Tabs */}
         <div className="space-y-1">
-          {ADVANCED_TABS_BASE.map((tab) => (
+          {advancedTabs.map((tab) => (
             <TabButton
               key={tab.id}
               tab={tab}
